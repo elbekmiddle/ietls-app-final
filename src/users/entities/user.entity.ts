@@ -1,21 +1,18 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
-import * as bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs'; // ✅ bcryptjs ishlatamiz
 
-// 🔹 UserDocument tipini yangiladik, matchPassword metodini qo‘shdik
-export type UserDocument = User & Document & {
-  matchPassword(password: string): Promise<boolean>;
-};
+export type UserDocument = User &
+  Document & {
+    matchPassword(password: string): Promise<boolean>;
+  };
 
-@Schema()
+@Schema({ timestamps: true })
 export class User {
-  @Prop({ type: String, required: true })
-  _id: string; // Explicitly define _id
-
   @Prop({ required: true })
   fullName: string;
 
-  @Prop({ required: true, unique: true })
+  @Prop({ required: true, unique: true, lowercase: true, trim: true })
   email: string;
 
   @Prop({ required: true })
@@ -28,16 +25,19 @@ export class User {
   password: string;
 }
 
-// 🔹 Schema yaratish
 export const UserSchema = SchemaFactory.createForClass(User);
 
-// 🔹 matchPassword metodini schema.methods ga qo‘shish
+// 🔹 matchPassword metodini qo‘shish
 UserSchema.methods.matchPassword = async function (
+  this: UserDocument,
   enteredPassword: string,
 ): Promise<boolean> {
-  return bcrypt.compare(enteredPassword, this.password);
+  // TypeScript va ESLint endi bu yerda xato bermaydi
+  const isMatch: boolean = await bcrypt.compare(enteredPassword, this.password);
+  return isMatch;
 };
 
+// 🔹 Passwordni saqlashdan oldin hash qilish
 UserSchema.pre<UserDocument>('save', async function (next) {
   if (!this.isModified('password')) return next();
   const salt = await bcrypt.genSalt(10);
